@@ -4,6 +4,7 @@
 #include "Common.h"
 //#include <open3d/Open3D.h>
 
+#define LOG(x) std::cout << x << std::endl
 
 Octree::Octree(const char* file_path, double vox_size)
 {
@@ -29,6 +30,10 @@ Octree::Octree(const char* file_path, double vox_size)
 	MyMesh m;
 	vcg::tri::io::Importer<MyMesh>::Open(m, file_path);
 
+	vcg::tri::RequirePerVertexNormal(m);
+	vcg::tri::UpdateNormal<MyMesh>::PerVertexNormalized(m);
+	printf("Input mesh  vn:%i fn:%i\n", m.VN(), m.FN());
+	printf("Mesh has %i vert and %i faces\n", m.VN(), m.FN());
 
 
 }

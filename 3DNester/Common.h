@@ -1,13 +1,13 @@
 #pragma once
 #include "vcg/complex/complex.h"
-#include <wrap/io_trimesh/import.h>
-#include <vcg/simplex/vertex/base.h>
-#include <vcg/simplex/vertex/component.h>
-#include <vcg/simplex/face/base.h>
-#include <vcg/simplex/face/component.h>
+#include "wrap/io_trimesh/import.h"
+#include "vcg/simplex/vertex/base.h"
+#include "vcg/simplex/vertex/component.h"
+#include "vcg/simplex/face/base.h"
+#include "vcg/simplex/face/component.h"
 //#include <vcg/complex/trimesh/base.h>
-#include <wrap/ply/plylib.h>
-#include <wrap/ply/plystuff.h>
+#include "wrap/ply/plylib.h"
+#include "wrap/ply/plystuff.h"
 
 class MyVertex; class MyEdge; class MyFace;
 struct MyUsedTypes : public vcg::UsedTypes<vcg::Use<MyVertex>   ::AsVertexType,

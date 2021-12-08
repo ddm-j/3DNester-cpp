@@ -79,7 +79,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <ExecutablePath>$(ExecutablePath)</ExecutablePath>
-    <IncludePath>C:\Users\bjorn\PyCharm Projects\3DNester-cpp\3DNester\vcglib\wrap\ply;C:\Users\bjorn\PyCharm Projects\3DNester-cpp\3DNester\vcglib;C:\open3d\bin;$(IncludePath)</IncludePath>
+    <IncludePath>C:\Users\bjorn\PyCharm Projects\3DNester-cpp\3DNester\vcglib;C:\open3d\bin;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
@@ -116,16 +116,16 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;WIN32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\Program Files\Open3D\include\open3d\3rdparty\GL;C:\Program Files\Open3D\include\open3d\3rdparty\Eigen;C:\Program Files\Open3D\include\open3d\3rdparty\GLFW;C:\Program Files\Open3D\include\open3d\3rdparty;C:\Program Files\Open3D\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\bjorn\PycharmProjects\3DNester-cpp\3DNester\vcglib\eigenlib;C:\Users\bjorn\PycharmProjects\3DNester-cpp\3DNester\vcglib;C:\Program Files\Open3D\include\open3d\3rdparty\GL;C:\Program Files\Open3D\include\open3d\3rdparty\Eigen;C:\Program Files\Open3D\include\open3d\3rdparty\GLFW;C:\Program Files\Open3D\include\open3d\3rdparty;C:\Program Files\Open3D\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard_C>stdc11</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>C:\Users\bjorn\PyCharm Projects\3DNester-cpp\3DNester\vcglib;C:\Program Files\Open3D\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\Program Files\Open3D\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
@@ -148,6 +148,7 @@
   <ItemGroup>
     <ClCompile Include="3DNester.cpp" />
     <ClCompile Include="Octree.cpp" />
+    <ClCompile Include="vcglib\wrap\ply\plylib.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Common.h" />
