@@ -10,7 +10,7 @@ public:
 	double mesh_sa; // Surface area of mesh
 	int min_points; // Number of points for random sampling
 
-	Octree(std::string file_path, double min_voxel);
+	Octree(const char* file_path, double min_voxel);
 
 };
 
