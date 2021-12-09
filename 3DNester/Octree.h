@@ -1,16 +1,26 @@
 #pragma once
 #include <iostream>
+#include "Common.h"
 
 class Octree
 {
 public:
 
-	double max_voxel_sa; // Maximum surface area estimate of a minimum voxel cross section
-	double point_density; // Density of points for random point sampling on mesh
 	double mesh_sa; // Surface area of mesh
-	int min_points; // Number of points for random sampling
 
 	Octree(const char* file_path, double min_voxel);
+
+private:
+
+	void calc_surface_area(MyMesh& m)
+	{
+		// Calculate mesh surface area: WHERE THE FUCK IS VCG DOCS?
+		double area = 0;
+		for (int i = 0; i < m.FN(); i++) {
+			area += m.face[i].Q();
+		}
+		this->mesh_sa = area;
+	}
 
 };
 

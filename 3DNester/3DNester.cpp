@@ -9,9 +9,7 @@ int main()
 {
     LOG("Loading up the shit.");
 
-    Octree tree("C:\\Users\\bjorn\\Pycharm Projects\\3DNester\\meshes\\GenerativeBracket.stl", 2.5);
-
-    LOG(tree.min_points);
+    Octree tree("GenerativeBracket.stl", 10.0);
 
 }
 
