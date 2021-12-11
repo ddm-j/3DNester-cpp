@@ -8,7 +8,8 @@
 #include "vcg/simplex/face/base.h"
 #include "vcg/simplex/face/component.h"
 #include <vcg/complex/algorithms/update/normal.h>
-#include<vcg/complex/algorithms/point_sampling.h>
+#include <vcg/complex/algorithms/point_sampling.h>
+#include <Eigen/Dense>
 
 
 class MyVertex; class MyEdge; class MyFace;

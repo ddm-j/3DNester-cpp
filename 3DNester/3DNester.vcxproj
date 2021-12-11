@@ -148,12 +148,14 @@
   <ItemGroup>
     <ClCompile Include="3DNester.cpp" />
     <ClCompile Include="Octree.cpp" />
+    <ClCompile Include="util.cpp" />
     <ClCompile Include="vcglib\wrap\ply\plylib.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Common.h" />
     <ClInclude Include="Octree.h" />
     <ClInclude Include="resource.h" />
+    <ClInclude Include="util.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="3DNester.rc" />

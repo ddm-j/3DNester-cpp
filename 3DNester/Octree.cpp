@@ -2,6 +2,7 @@
 #include <math.h>
 #include "Octree.h"
 #include "Common.h"
+#include "util.h"
 //#include <open3d/Open3D.h>
 
 #define LOG(x) std::cout << x << std::endl
@@ -9,8 +10,17 @@
 Octree::Octree(const char* file_path, double vox_size)
 {
 	// Octree Constructor Function
+
+	// Variable Declarations
 	double max_voxel_sa, point_density;
 	int min_points;
+	Eigen::Matrix4d bbox_trans;
+	bbox_trans << 
+			1, 0, 0, 0,
+			0, 1, 0, 0,
+			0, 0, 1, 0,
+			0, 0, 0, 1;
+
 
 	// Load the mesh with VCG
 	MyMesh m;
@@ -51,12 +61,34 @@ Octree::Octree(const char* file_path, double vox_size)
 	vcg::tri::SurfaceSampling<MyMesh, vcg::tri::TrivialSampler<MyMesh> >::PoissonDiskPruning(mps, MontecarloSurfaceMesh, radius, pp);
 	vcg::tri::BuildMeshFromCoordVector(PoissonSurfaceMesh, sampleVec);
 
-	printf("Computed a feature aware poisson disk distribution of %i vertices radius is %6.3f\n", PoissonSurfaceMesh.VN(), radius);
+	printf("Computed a poisson disk distribution of %i vertices radius is %6.3f\n", PoissonSurfaceMesh.VN(), radius);
 
 	//vcg::tri::io::ExporterOFF<MyMesh>::Save(PoissonSurfaceMesh, "test.off");
-	
-	
-	
 
-	
+	// Get "affine ready" column vector matrix of points
+	this->get_mesh_points(PoissonSurfaceMesh, this->samplePoints);
+
+	// Translate the center of our bounding box to the origin of the CS
+	this->update_bbox(this->samplePoints);
+	bbox_trans.block(0, 3, 3, 1) = -this->bboxCenter.head(3);
+	this->samplePoints = bbox_trans * this->samplePoints;
+
+	// Split the nodes?
+	LOG(util::split_node(bboxMinMax.block(0, 0, 3, 2)));
+
+}
+
+void Octree::update_bbox(Eigen::MatrixXd& pcd)
+{
+	// This function updates the class bounding box attributes using a supplied pointcloud
+
+	Eigen::Vector4d min = pcd.rowwise().minCoeff();
+	Eigen::Vector4d max = pcd.rowwise().maxCoeff();
+
+	// Set the Centerpoint
+	this->bboxCenter = min + 0.5 * (max - min);
+
+	// Set outMinMax
+	this->bboxMinMax.block(0, 0, 4, 1) = min;
+	this->bboxMinMax.block(0, 1, 4, 1) = max;
 }
