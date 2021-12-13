@@ -73,8 +73,11 @@ Octree::Octree(const char* file_path, double vox_size)
 	bbox_trans.block(0, 3, 3, 1) = -this->bboxCenter.head(3);
 	this->samplePoints = bbox_trans * this->samplePoints;
 
-	// Split the nodes?
-	LOG(util::split_node(bboxMinMax.block(0, 0, 3, 2)));
+	// Build the tree
+	Eigen::Matrix<double, 3, 16> nodes = util::split_node(bboxMinMax.block(0, 0, 3, 2));
+	int depth = 0;
+	int max_depth = round(log(this->rootSize / vox_size) / log(2.0));
+	this->build_tree(this->samplePoints, nodes, max_depth, depth);
 
 }
 
@@ -91,4 +94,24 @@ void Octree::update_bbox(Eigen::MatrixXd& pcd)
 	// Set outMinMax
 	this->bboxMinMax.block(0, 0, 4, 1) = min;
 	this->bboxMinMax.block(0, 1, 4, 1) = max;
+
+	// Set the bounding cube size (root node)
+	this->rootSize = (max - min).maxCoeff();
+}
+
+void Octree::build_tree(Eigen::MatrixXd& points, Eigen::Matrix<double, 3, 16>& nodes, int maxDepth, int &depth)
+{
+	// Recursively build the octree node structure
+
+	// If we are calling this function, we are advancing to the next depth level
+	depth++;
+
+	// Loop into the nodes
+	for (int i = 0; i < 16; i += 2)
+	{
+		// Checkpoints
+		this->check_points(points, nodes.block(0, i, 3, 2));
+	}
+
+
 }
