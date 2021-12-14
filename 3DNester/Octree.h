@@ -4,6 +4,38 @@
 
 #define LOG(x) std::cout << x << std::endl
 
+struct Node {
+
+	Eigen::Vector4d center;
+	int key;
+	int8_t childMask;
+	bool isLeaf;
+
+	Node(Eigen::Vector3d center, int parentKey, int childNum, bool aisLeaf)
+	{
+		// Set the Node Centerpoint (Affine ready format 4x1)
+		this->center(Eigen::seq(0, 2)) = center;
+		this->center(3) = 1.0;
+		LOG(this->center);
+
+		// Calculate the location code (key) for this node
+		this->key = (parentKey << 3) + childNum;
+
+		// Initialize childMask
+		this->childMask = 0;
+
+		// Set the leaf status
+		this->isLeaf = aisLeaf;
+	}
+
+	void add_child()
+	{
+		
+		(this->childMask << 1) + 1;
+
+	}
+};
+
 class Octree
 {
 public:
@@ -16,12 +48,12 @@ public:
 	Eigen::MatrixXd octreeCenters; // Matrix 3xN_nodes (unknown size) that will store the octree node center points
 	double rootSize; // Scalar maximum dimension of the bounding box (size of the root node)
 
-
+	// Public Methods
 	Octree(const char* file_path, double min_voxel);
 
 	void update_bbox(Eigen::MatrixXd& pcd);
 
-	void build_tree(Eigen::MatrixXd& points, Eigen::Matrix<double, 3, 16>& nodes, int maxDepth, int& depth);
+	void build_tree(Node *parent, Eigen::MatrixXd points, Eigen::Matrix<double, 3, 16>& nodes, int maxDepth, int& depth);
 
 private:
 
@@ -60,55 +92,37 @@ private:
 		LOG("Matrix packing complete.");
 	}
 
-	Eigen::MatrixXd check_points(Eigen::MatrixXd& points, Eigen::Matrix<double, 3, 2> node)
+	Eigen::VectorXi check_points(Eigen::MatrixXd points, Eigen::Matrix<double, 3, 2> node)
 	{
-		// Function to check which points are inside our node
+		// Which Points are inside node
+		bool c1, c2, c3;
+		Eigen::VectorXi indices(points.cols());
+		Eigen::MatrixXd p;
+		int cnt = 0;
 
-		Eigen::Vector3d min = node.col(0);
-		Eigen::Vector3d max = node.col(1);
+		// Loop through points
+		for (int i = 0; i < points.cols(); i++)
+		{
+			p = points.block(0, i, 3, 1);
+			c1 = (node(0, 0) <= p(0, 0)) && (p(0, 0) <= node(0, 1));
+			c2 = (node(1, 0) <= p(1, 0)) && (p(1, 0) <= node(1, 1));
+			c3 = (node(2, 0) <= p(2, 0)) && (p(2, 0) <= node(2, 1));
 
-		// Preprocess
-		Eigen::Vector3d b1 = min;
-		Eigen::Vector3d b2{ max(0), min(1), min(2) };
-		Eigen::Vector3d b3{ max(0), max(1), min(2) };
-		Eigen::Vector3d b4{ min(0), max(1), min(2) };
-		Eigen::Vector3d t1{ min(0), min(1), max(2) };
-		Eigen::Vector3d t2{ max(0), min(1), max(2) };
-		Eigen::Vector3d t3{ max(0), max(1), max(2) };
-		Eigen::Vector3d t4{ min(0), max(1), max(2) };
-		Eigen::Vector3d center = (b1 + t3) / 2.0;
+			if (c1 && c2 && c3)
+			{
+				indices(cnt) = i;
+				cnt++;
+			}
+		}
 
-		// First Direction
-		Eigen::Vector3d d1 = t1 - b1;
-		double s1 = d1.norm();
-		d1 /= s1;
+		
+		if (cnt == 0)
+		{
+			// Return unintialized vector (no assignments made) for checking outside of the function
+			return indices;
+		}
 
-		// Second Direction
-		Eigen::Vector3d d2 = b2 - b1;
-		double s2 = d2.norm();
-		d2 /= s2;
-
-		// Third Directionn
-		Eigen::Vector3d d3 = b4 - b1;
-		double s3 = d3.norm();
-		d3 /= s3;
-
-		// Work Some Magic
-		Eigen::MatrixXd dir_vec = points.block(0, 0, 3, points.cols()).colwise() - center;
-
-		Eigen::Matrix<bool, 1, Eigen::Dynamic> res1 = ((2 * (d1.asDiagonal() * dir_vec).colwise().sum().cwiseAbs()).array() > s1);
-		Eigen::Matrix<bool, 1, Eigen::Dynamic> res2 = ((2 * (d2.asDiagonal() * dir_vec).colwise().sum().cwiseAbs()).array() > s2);
-		Eigen::Matrix<bool, 1, Eigen::Dynamic> res3 = ((2 * (d3.asDiagonal() * dir_vec).colwise().sum().cwiseAbs()).array() > s3);
-
-		Eigen::Matrix<bool, 1, Eigen::Dynamic> mask = res1.array() * res2.array() * res3.array();
-
-
-		LOG(points(Eigen::all,mask));
-
-		std::cin.get();
-
-
-		return dir_vec;
+		return indices(Eigen::seq(0,cnt));
 	}
 
 };

@@ -72,12 +72,14 @@ Octree::Octree(const char* file_path, double vox_size)
 	this->update_bbox(this->samplePoints);
 	bbox_trans.block(0, 3, 3, 1) = -this->bboxCenter.head(3);
 	this->samplePoints = bbox_trans * this->samplePoints;
+	this->update_bbox(this->samplePoints);
 
 	// Build the tree
 	Eigen::Matrix<double, 3, 16> nodes = util::split_node(bboxMinMax.block(0, 0, 3, 2));
 	int depth = 0;
 	int max_depth = round(log(this->rootSize / vox_size) / log(2.0));
-	this->build_tree(this->samplePoints, nodes, max_depth, depth);
+	Node* pNode = new Node((bboxMinMax.col(0)+bboxMinMax.col(1))/2, 1, 0, false);
+	this->build_tree(pNode, this->samplePoints, nodes, max_depth, depth);
 
 }
 
@@ -89,7 +91,7 @@ void Octree::update_bbox(Eigen::MatrixXd& pcd)
 	Eigen::Vector4d max = pcd.rowwise().maxCoeff();
 
 	// Set the Centerpoint
-	this->bboxCenter = min + 0.5 * (max - min);
+	this->bboxCenter = (max + min)/2.0;
 
 	// Set outMinMax
 	this->bboxMinMax.block(0, 0, 4, 1) = min;
@@ -99,18 +101,40 @@ void Octree::update_bbox(Eigen::MatrixXd& pcd)
 	this->rootSize = (max - min).maxCoeff();
 }
 
-void Octree::build_tree(Eigen::MatrixXd& points, Eigen::Matrix<double, 3, 16>& nodes, int maxDepth, int &depth)
+void Octree::build_tree(Node *parent, Eigen::MatrixXd points, Eigen::Matrix<double, 3, 16>& nodes, int maxDepth, int &depth)
 {
 	// Recursively build the octree node structure
 
-	// If we are calling this function, we are advancing to the next depth level
+	Eigen::VectorXi indices;
+
+	// If we are calling this function, we are advancing to the next depth level in the octree
 	depth++;
 
 	// Loop into the nodes
 	for (int i = 0; i < 16; i += 2)
 	{
-		// Checkpoints
-		this->check_points(points, nodes.block(0, i, 3, 2));
+		// Get the indices of points that are inside the node
+		indices = this->check_points(points, nodes.block(0, i, 3, 2));
+
+		if ((indices.rows() != points.cols()) && (depth <= maxDepth))
+		{
+			// In this case, we need to split this node and advance the octree depth down this branch
+			LOG("Create a new node");
+			Node* pNode = new Node((nodes.col(i) + nodes.col(i + 1)) / 2, parent->key, i / 2, false);
+			
+			// Advance the childMask of the parent node
+			parent->add_child();
+			LOG("Parent Child Mask");
+			LOG(parent->childMask);
+
+		}
+		else if (indices.rows() != points.cols())
+		{
+			// In this case, we are at maximum depth and this is a leaf node
+			Node* pNode = new Node((nodes.col(i) + nodes.col(i + 1)) / 2, parent->key, i / 2, true);
+		}
+
+		std::cin.get();
 	}
 
 
