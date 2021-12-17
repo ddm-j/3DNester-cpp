@@ -1,40 +1,13 @@
 #pragma once
 #include <iostream>
+#include <climits>
+#include <bitset>
+#include "util.h"
 #include "Common.h"
 
 #define LOG(x) std::cout << x << std::endl
 
-struct Node {
-
-	Eigen::Vector4d center;
-	int key;
-	int8_t childMask;
-	bool isLeaf;
-
-	Node(Eigen::Vector3d center, int parentKey, int childNum, bool aisLeaf)
-	{
-		// Set the Node Centerpoint (Affine ready format 4x1)
-		this->center(Eigen::seq(0, 2)) = center;
-		this->center(3) = 1.0;
-		LOG(this->center);
-
-		// Calculate the location code (key) for this node
-		this->key = (parentKey << 3) + childNum;
-
-		// Initialize childMask
-		this->childMask = 0;
-
-		// Set the leaf status
-		this->isLeaf = aisLeaf;
-	}
-
-	void add_child()
-	{
-		
-		(this->childMask << 1) + 1;
-
-	}
-};
+struct Node;
 
 class Octree
 {
@@ -47,15 +20,40 @@ public:
 	Eigen::MatrixXd samplePoints; // Matrix 3xN_samples (unknown size) that will store the poisson sampled mesh points
 	Eigen::MatrixXd octreeCenters; // Matrix 3xN_nodes (unknown size) that will store the octree node center points
 	double rootSize; // Scalar maximum dimension of the bounding box (size of the root node)
+	int maxDepth; // Maximum tree depth, calculated during construction
+	Node* rootNode; // Pointer to the root node of the octree
+	std::unordered_map<int, Node *> treeMap;
 
 	// Public Methods
 	Octree(const char* file_path, double min_voxel);
 
 	void update_bbox(Eigen::MatrixXd& pcd);
 
-	void build_tree(Node *parent, Eigen::MatrixXd points, Eigen::Matrix<double, 3, 16>& nodes, int maxDepth, int& depth);
+	void build_tree(Node* parent, Eigen::MatrixXd points, Eigen::Matrix<double, 3, 16> nodes, int depth);
+
+	void traverse_tree(Node * pNode);
 
 private:
+
+	int get_depth(int key)
+	{
+		// Calculate the octree node depth given the location code (key)
+		// Unsign the key
+
+		// Add a sentinel bit to the number
+		//key |= 1ull << util::msb(key);
+
+		// Begin depth loop
+		for (int d = 0; key; d++)
+		{
+			if (key == 1) return d;
+			key >>= 3;
+
+
+			if (d > 21) assert(0); // bad key
+		}
+		assert(0); // bad key
+	}
 
 	void calc_surface_area(MyMesh& m)
 	{
@@ -92,13 +90,12 @@ private:
 		LOG("Matrix packing complete.");
 	}
 
-	Eigen::VectorXi check_points(Eigen::MatrixXd points, Eigen::Matrix<double, 3, 2> node)
+	std::vector<int> check_points(Eigen::MatrixXd points, Eigen::Matrix<double, 3, 2> node)
 	{
 		// Which Points are inside node
 		bool c1, c2, c3;
-		Eigen::VectorXi indices(points.cols());
+		std::vector<int> indices;
 		Eigen::MatrixXd p;
-		int cnt = 0;
 
 		// Loop through points
 		for (int i = 0; i < points.cols(); i++)
@@ -110,20 +107,59 @@ private:
 
 			if (c1 && c2 && c3)
 			{
-				indices(cnt) = i;
-				cnt++;
+				indices.push_back(i);
 			}
 		}
 
-		
-		if (cnt == 0)
-		{
-			// Return unintialized vector (no assignments made) for checking outside of the function
-			return indices;
-		}
-
-		return indices(Eigen::seq(0,cnt));
+		return indices;
 	}
 
+};
+
+struct Node {
+
+	Eigen::Vector4d center;
+	int key;
+	int8_t childMask;
+	bool isLeaf;
+
+	Node(Octree* tree, Eigen::VectorXd center, int parentKey, int childNum, bool aisLeaf)
+	{
+		// Node constructor
+
+		if (center.rows() == 3)
+		{
+			// We've been passed a 3D vector. Convert to a 4D for affine readiness
+			this->center(Eigen::seq(0, 2)) = center;
+			this->center(3) = 1.0;
+		}
+		else if (center.rows() == 4)
+		{
+			// We've been passed an affine ready vector
+			this->center = center;
+		}
+		else {
+			// We've been passed a bad vector (not the right size)
+			assert(0);
+		}
+
+		// Calculate the location code (key) for this node
+		this->key = (parentKey << 3) + childNum;
+
+		// Add this node to the tree hashmap
+		tree->treeMap[this->key] = this;
+		//bitset<sizeof(this->key)* CHAR_BIT> x(this->key);
+
+		// Initialize childMask
+		this->childMask = 0;
+
+		// Set the leaf status
+		this->isLeaf = aisLeaf;
+	}
+
+	void advance_child_mask(int i)
+	{
+		this->childMask |= 1ull << i;
+	}
 };
 

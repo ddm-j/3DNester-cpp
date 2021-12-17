@@ -1,4 +1,6 @@
 #include "util.h"
+#include <bitset>
+#include <iostream>
 
 namespace util {
 
@@ -29,6 +31,31 @@ namespace util {
 
 		return nodes;
 
+	}
+
+	int msb(int key)
+	{
+		// Get the most significant bit of our integer
+		int cnt = 0;
+		while (key > 1) { cnt++; key >>= 1; }
+		return cnt;
+	}
+
+	void log_bitset(int i, int size)
+	{
+		if (size == 8)
+		{
+			std::bitset<8> x(i);
+			std::cout << x << std::endl;
+		}
+		else if (size == sizeof(i)*CHAR_BIT)
+		{
+			std::bitset<sizeof(i)* CHAR_BIT> x(i);
+			std::cout << x << std::endl;
+		}
+		else {
+			assert("Option not defined.");
+		}
 	}
 
 }

@@ -1,15 +1,16 @@
 #include <iostream>
+#include <bitset>
 #include <math.h>
 #include "Octree.h"
 #include "Common.h"
 #include "util.h"
-//#include <open3d/Open3D.h>
 
 #define LOG(x) std::cout << x << std::endl
 
 Octree::Octree(const char* file_path, double vox_size)
 {
 	// Octree Constructor Function
+	LOG("Constructing Octree");
 
 	// Variable Declarations
 	double max_voxel_sa, point_density;
@@ -77,9 +78,9 @@ Octree::Octree(const char* file_path, double vox_size)
 	// Build the tree
 	Eigen::Matrix<double, 3, 16> nodes = util::split_node(bboxMinMax.block(0, 0, 3, 2));
 	int depth = 0;
-	int max_depth = round(log(this->rootSize / vox_size) / log(2.0));
-	Node* pNode = new Node((bboxMinMax.col(0)+bboxMinMax.col(1))/2, 1, 0, false);
-	this->build_tree(pNode, this->samplePoints, nodes, max_depth, depth);
+	this->maxDepth = round(log(this->rootSize / vox_size) / log(2.0));
+	this->rootNode = new Node(this, (bboxMinMax.col(0)+bboxMinMax.col(1))/2, 0, 1, false);
+	this->build_tree(this->rootNode, this->samplePoints, nodes, depth);
 
 }
 
@@ -101,41 +102,74 @@ void Octree::update_bbox(Eigen::MatrixXd& pcd)
 	this->rootSize = (max - min).maxCoeff();
 }
 
-void Octree::build_tree(Node *parent, Eigen::MatrixXd points, Eigen::Matrix<double, 3, 16>& nodes, int maxDepth, int &depth)
+void Octree::build_tree(Node *parent, Eigen::MatrixXd points, Eigen::Matrix<double, 3, 16> nodes, int depth)
 {
 	// Recursively build the octree node structure
 
-	Eigen::VectorXi indices;
+	std::vector<int> indices;
 
 	// If we are calling this function, we are advancing to the next depth level in the octree
 	depth++;
 
 	// Loop into the nodes
-	for (int i = 0; i < 16; i += 2)
+	for (int i = 0; i < 8; i ++)
 	{
 		// Get the indices of points that are inside the node
-		indices = this->check_points(points, nodes.block(0, i, 3, 2));
+		indices = this->check_points(points, nodes.block(0, i*2, 3, 2));
 
-		if ((indices.rows() != points.cols()) && (depth <= maxDepth))
+		if ((indices.size() != 0) && (depth <= this->maxDepth))
 		{
 			// In this case, we need to split this node and advance the octree depth down this branch
-			LOG("Create a new node");
-			Node* pNode = new Node((nodes.col(i) + nodes.col(i + 1)) / 2, parent->key, i / 2, false);
-			
+			Node* pNode = new Node(this, (nodes.col(i*2) + nodes.col(i*2 + 1)) / 2, parent->key, i, false);
+
+			// Split the nodes and start recursive tree build
+			this->build_tree(pNode, points(Eigen::all, indices), util::split_node(nodes.block(0, i*2, 3, 2)), depth);
+
 			// Advance the childMask of the parent node
-			parent->add_child();
-			LOG("Parent Child Mask");
-			LOG(parent->childMask);
+			parent->advance_child_mask(i);
 
 		}
-		else if (indices.rows() != points.cols())
+		else if (indices.size() != 0)
 		{
 			// In this case, we are at maximum depth and this is a leaf node
-			Node* pNode = new Node((nodes.col(i) + nodes.col(i + 1)) / 2, parent->key, i / 2, true);
+			Node* pNode = new Node(this, (nodes.col(i*2) + nodes.col(i*2 + 1)) / 2, parent->key, i, true);
+
+			// Advance the childmask
+			parent->advance_child_mask(i);
 		}
-
-		std::cin.get();
 	}
+}
 
+void Octree::traverse_tree(Node * pNode)
+{
+	// Traverses the linear hashed octree
+	for (int i = 0; i < 8; i++)
+	{
+		// See if ith child exists (use childMask)
+		if (pNode->childMask & (1 << i))
+		{
+			// Calculate the "key" of this child
+			int key = (pNode->key << 3) + i;
 
+			// Retrieve the node pointer of this child
+			Node* childNode = this->treeMap.at(key);
+
+			// Get the depth of this node
+			int depth = this->get_depth(childNode->key);
+			
+			if (childNode->isLeaf)
+			{
+				printf("Visiting leaf node at depth %i with center point:\n", depth);
+				LOG(childNode->center);
+			}
+			else
+			{
+				printf("Visiting node at depth %i with center point:\n", depth);
+				LOG(childNode->center);
+			}
+
+			// Recursively visit nodes
+			this->traverse_tree(childNode);
+		}
+	}
 }
