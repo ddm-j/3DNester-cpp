@@ -7,6 +7,11 @@
 
 #define LOG(x) std::cout << x << std::endl
 
+Octree::Octree()
+{
+
+}
+
 Octree::Octree(const char* file_path, double vox_size)
 {
 	// Octree Constructor Function
@@ -16,11 +21,7 @@ Octree::Octree(const char* file_path, double vox_size)
 	double max_voxel_sa, point_density;
 	int min_points;
 	Eigen::Matrix4d bbox_trans;
-	bbox_trans << 
-			1, 0, 0, 0,
-			0, 1, 0, 0,
-			0, 0, 1, 0,
-			0, 0, 0, 1;
+	bbox_trans.setIdentity();
 
 
 	// Load the mesh with VCG
@@ -70,21 +71,20 @@ Octree::Octree(const char* file_path, double vox_size)
 	this->get_mesh_points(PoissonSurfaceMesh, this->samplePoints);
 
 	// Translate the center of our bounding box to the origin of the CS
-	this->update_bbox(this->samplePoints);
+	this->update_bbox(this->samplePoints, vox_size);
 	bbox_trans.block(0, 3, 3, 1) = -this->bboxCenter.head(3);
 	this->samplePoints = bbox_trans * this->samplePoints;
-	this->update_bbox(this->samplePoints);
+	this->update_bbox(this->samplePoints, vox_size);
 
 	// Build the tree
 	Eigen::Matrix<double, 3, 16> nodes = util::split_node(bboxMinMax.block(0, 0, 3, 2));
 	int depth = 0;
-	this->maxDepth = round(log(this->rootSize / vox_size) / log(2.0));
 	this->rootNode = new Node(this, (bboxMinMax.col(0)+bboxMinMax.col(1))/2, 0, 1, false);
 	this->build_tree(this->rootNode, this->samplePoints, nodes, depth);
 
 }
 
-void Octree::update_bbox(Eigen::MatrixXd& pcd)
+void Octree::update_bbox(Eigen::MatrixXd& pcd, double voxSize)
 {
 	// This function updates the class bounding box attributes using a supplied pointcloud
 
@@ -100,6 +100,18 @@ void Octree::update_bbox(Eigen::MatrixXd& pcd)
 
 	// Set the bounding cube size (root node)
 	this->rootSize = (max - min).maxCoeff();
+
+	if (voxSize != 0)
+	{
+		this->maxDepth = round(log(this->rootSize / voxSize) / log(2.0));
+	}
+
+	// Calculate root/lead radius'
+	this->rootRadius = 3 * sqrt(this->rootSize) / 2;
+	this->leafRadius = 3 * sqrt(this->rootSize / pow(2, this->maxDepth+1)) / 2;
+
+	printf("Updating root radius to %f\n", this->rootRadius);
+	printf("Updating leaf radius to %f\n", this->leafRadius);
 }
 
 void Octree::build_tree(Node *parent, Eigen::MatrixXd points, Eigen::Matrix<double, 3, 16> nodes, int depth)
@@ -155,7 +167,7 @@ void Octree::traverse_tree(Node * pNode)
 			Node* childNode = this->treeMap.at(key);
 
 			// Get the depth of this node
-			int depth = this->get_depth(childNode->key);
+			int depth = util::get_depth(childNode->key);
 			
 			if (childNode->isLeaf)
 			{
@@ -170,6 +182,47 @@ void Octree::traverse_tree(Node * pNode)
 
 			// Recursively visit nodes
 			this->traverse_tree(childNode);
+		}
+	}
+}
+
+void Octree::collision_test(Eigen::Matrix4d u, Eigen::Matrix4d v, int pU, int pV, double interval, int& cnt)
+{
+	// Test the number of leaf collisions between two instances of octree (defined by different affine positions U & V)
+
+	// Loop through the children of U & V, testing collisions between them
+	int8_t maskU = this->treeMap.at(pU)->childMask;
+	int8_t maskV = this->treeMap.at(pV)->childMask;
+	int childKeyU, childKeyV;
+	double dist;
+
+	for (int i = 0; i < 8; i++)
+	{
+		for (int j = i; j < 8; j++)
+		{
+			if (maskU & (1 << i) && (maskV & (1 << j)))
+			{
+				// Test for a collision at this level
+				childKeyU = (pU << 3) + i;
+				childKeyV = (pV << 3) + j;
+
+				dist = 2 * this->treeMap.at(childKeyU)->radius + interval;
+				if (util::sphere_collision(u*this->treeMap.at(childKeyU)->center, v*this->treeMap.at(childKeyV)->center, dist))
+				{
+					// Potential collision detected
+					if (this->treeMap.at(childKeyU)->isLeaf)
+					{
+						// We are at max depth. Increment the counter
+						cnt++;
+					}
+					else
+					{
+						// We are not at max depth of the tree. Recursively go deeper
+						Octree::collision_test(u, v, childKeyU, childKeyV, interval, cnt);
+					}
+				}
+
+			}
 		}
 	}
 }

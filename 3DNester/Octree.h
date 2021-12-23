@@ -20,40 +20,26 @@ public:
 	Eigen::MatrixXd samplePoints; // Matrix 3xN_samples (unknown size) that will store the poisson sampled mesh points
 	Eigen::MatrixXd octreeCenters; // Matrix 3xN_nodes (unknown size) that will store the octree node center points
 	double rootSize; // Scalar maximum dimension of the bounding box (size of the root node)
+	double rootRadius; // Scalar radius of the root node. Used in collision detection
+	double leafRadius; // Scalar radius of the leaf nodes. Used in collision detection
 	int maxDepth; // Maximum tree depth, calculated during construction
 	Node* rootNode; // Pointer to the root node of the octree
 	std::unordered_map<int, Node *> treeMap;
 
 	// Public Methods
+	Octree();
+
 	Octree(const char* file_path, double min_voxel);
 
-	void update_bbox(Eigen::MatrixXd& pcd);
+	void update_bbox(Eigen::MatrixXd& pcd, double voxSize=0);
 
 	void build_tree(Node* parent, Eigen::MatrixXd points, Eigen::Matrix<double, 3, 16> nodes, int depth);
 
 	void traverse_tree(Node * pNode);
 
+	void collision_test(Eigen::Matrix4d u, Eigen::Matrix4d v, int pU, int pV, double interval, int& cnt);
+
 private:
-
-	int get_depth(int key)
-	{
-		// Calculate the octree node depth given the location code (key)
-		// Unsign the key
-
-		// Add a sentinel bit to the number
-		//key |= 1ull << util::msb(key);
-
-		// Begin depth loop
-		for (int d = 0; key; d++)
-		{
-			if (key == 1) return d;
-			key >>= 3;
-
-
-			if (d > 21) assert(0); // bad key
-		}
-		assert(0); // bad key
-	}
 
 	void calc_surface_area(MyMesh& m)
 	{
@@ -119,6 +105,7 @@ private:
 struct Node {
 
 	Eigen::Vector4d center;
+	double radius;
 	int key;
 	int8_t childMask;
 	bool isLeaf;
@@ -145,6 +132,11 @@ struct Node {
 
 		// Calculate the location code (key) for this node
 		this->key = (parentKey << 3) + childNum;
+
+		// Calculate the radius of this node
+		int depth = util::get_depth(this->key);
+		int d = tree->rootSize / (pow(2, depth));
+		this->radius = 3 * sqrt(d) / 2;
 
 		// Add this node to the tree hashmap
 		tree->treeMap[this->key] = this;

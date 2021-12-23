@@ -1,25 +1,87 @@
 // 3DNester.cpp : This file contains the 'main' function. Program execution begins and ends there.
 //
 #include <iostream>
+#include <chrono>
 #include "Octree.h"
+#include "Scene.h"
 
 #define LOG(x) std::cout << x << std::endl
 
 int main()
 {
-    LOG("Loading up the shit.");
+    LOG("Firing up the 3D Nester");
 
+    // Create a part
     Octree tree("GenerativeBracket.stl", 10.0);
 
+    // Create a scene
+    Eigen::Vector3d envelope = { 380, 284, 380 };
+    Scene scene(tree, envelope, 2.5, 2.5);
+
+ 
+
+    // Test collision pairing matrix removal
+    Eigen::Vector3d n;
+    int cnt = 0;
+    int max = 500;
+    LOG("Starting collision removal loop");
+    for (int i = 0; i < max; i++)
+    {
+        // Add a part
+        scene.add_part(n, 1.0);
+
+        // Add phony collision data
+        for (int j = i; j < max; j++)
+        {
+            //scene.collisionArray(i, j) = cnt;
+            cnt++;
+        }
+    }
+
+    LOG("Testing collisions");
+    auto start = chrono::high_resolution_clock::now();
+    scene.part_collisions(1);
+    auto stop = chrono::high_resolution_clock::now();
+    auto diff = chrono::duration_cast<chrono::milliseconds>(stop - start);
+    LOG(diff.count());
+    
+    /*
+    for (int i = 0; i < max; i++)
+    {
+        scene.part_collisions(i);
+    }
+    */
+
+    //LOG(scene.collisionArray);
+
+    /*
+
+    // Before removal
+    LOG(scene.collisionArray);
+    
+    scene.remove_part(5);
+    
+    // After removal
+    LOG(scene.collisionArray);
+
+    scene.remove_part(3);
+
+    LOG(scene.collisionArray);
+
+    LOG(scene.nParts);
+
+    */
+
+
+    /*
+
+    // Run through the parts in the scene and log out their local CS origin (location)
+    LOG("Logging scene part locations.");
+    for (int i = 0; i < scene.objects.size(); i++)
+    {
+        LOG(scene.objects[i]->get_center());
+    }
+
+    */
+
 }
-
-// Run program: Ctrl + F5 or Debug > Start Without Debugging menu
-// Debug program: F5 or Debug > Start Debugging menu
-
-// Tips for Getting Started: 
-//   1. Use the Solution Explorer window to add/manage files
-//   2. Use the Team Explorer window to connect to source control
-//   3. Use the Output window to see build output and other messages
-//   4. Use the Error List window to view errors
-//   5. Go to Project > Add New Item to create new code files, or Project > Add Existing Item to add existing code files to the project
-//   6. In the future, to open this project again, go to File > Open > Project and select the .sln file

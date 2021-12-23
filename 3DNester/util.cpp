@@ -1,6 +1,8 @@
 #include "util.h"
 #include <bitset>
+#include <math.h>
 #include <iostream>
+#include <random>
 
 namespace util {
 
@@ -58,4 +60,84 @@ namespace util {
 		}
 	}
 
+	int get_depth(int key)
+	{
+		// Calculate the octree node depth given the location code (key)
+		// Unsign the key
+
+		// Add a sentinel bit to the number
+		//key |= 1ull << util::msb(key);
+
+		// Begin depth loop
+		for (int d = 0; key; d++)
+		{
+			if (key == 1) return d;
+			key >>= 3;
+
+
+			if (d > 21) assert(0); // bad key
+		}
+		assert(0); // bad key
+	}
+
+	double rand_double(double min, double max)
+	{
+		std::random_device rd;
+		std::default_random_engine eng(rd());
+		std::uniform_real_distribution<double> distr(min, max);
+
+		return distr(eng);
+	}
+
+	Eigen::Matrix4d create_rotation_matrix(double angle, int axis, bool degrees)
+	{
+		// Takes an angle, axis and outputs an affine rotation matrix. 
+		// Bettern than a general rotation matrix (x, y, z) rotations. Avoids gimbal lock
+		Eigen::Matrix4d rotationMatrix;
+
+		// Convert degrees to radians
+		angle = degrees ? angle * pi / 180 : angle;
+
+		// Get the Affine Transformation matrices
+		switch (axis)
+		{
+		case 0:
+			// Rotation about the x-axis
+			rotationMatrix << 1, 0,		      0,		  0,
+							  0, cos(angle), -sin(angle), 0,
+							  0, sin(angle),  cos(angle), 0,
+							  0, 0,			  0,		  1;
+			break;
+
+		case 1:
+			// Rotation about the y-axis
+			rotationMatrix << cos(angle), 0, -sin(angle), 0,
+							  0,	      1,  0,		  0,
+							  sin(angle), 0,  cos(angle), 0,
+							  0,		  0,  0,		  1;
+			break;
+
+		case 2:
+			// Rotation about the z-axis
+			rotationMatrix << cos(angle), -sin(angle), 0, 0,
+							  sin(angle),  cos(angle), 0, 0,
+							  0,		   0,		   1, 0,
+							  0,		   0,		   0, 1;
+			break;
+
+		defualt:
+			// Incorrect axis specified.
+			printf("Axis options 0, 1, 2 (x, y, z) are acceptable. Incorrect axis specified.\n");
+			assert(0);
+		}
+
+		return rotationMatrix;
+	}
+
+	bool sphere_collision(Eigen::Vector4d u, Eigen::Vector4d v, double distance)
+	{
+		// Test the collision between two spheres
+
+		return (u - v).norm() <= distance;
+	}
 }
