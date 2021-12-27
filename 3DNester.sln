@@ -5,7 +5,7 @@ VisualStudioVersion = 16.0.31829.152
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "3DNester", "3DNester\3DNester.vcxproj", "{63BB8516-C9D8-4F7C-8229-A40FE54247E6}"
 EndProject
-Project("{911E67C6-3D85-4FCE-B560-20A9C3E3FF48}") = "Open3D", "..\..\..\..\..\..\open3d\bin\Open3D\Open3D.exe", "{29B9A060-88FB-4A72-AA78-CF719D83EB68}"
+Project("{911E67C6-3D85-4FCE-B560-20A9C3E3FF48}") = "Open3D", "..\..\..\..\open3d\bin\Open3D\Open3D.exe", "{29B9A060-88FB-4A72-AA78-CF719D83EB68}"
 	ProjectSection(DebuggerProjectSystem) = preProject
 		PortSupplier = 00000000-0000-0000-0000-000000000000
 		Executable = C:\open3d\bin\Open3D\Open3D.exe
@@ -23,6 +23,8 @@ Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
 		Debug|x86 = Debug|x86
+		Release 2|x64 = Release 2|x64
+		Release 2|x86 = Release 2|x86
 		Release|x64 = Release|x64
 		Release|x86 = Release|x86
 	EndGlobalSection
@@ -31,12 +33,18 @@ Global
 		{63BB8516-C9D8-4F7C-8229-A40FE54247E6}.Debug|x64.Build.0 = Debug|x64
 		{63BB8516-C9D8-4F7C-8229-A40FE54247E6}.Debug|x86.ActiveCfg = Debug|Win32
 		{63BB8516-C9D8-4F7C-8229-A40FE54247E6}.Debug|x86.Build.0 = Debug|Win32
+		{63BB8516-C9D8-4F7C-8229-A40FE54247E6}.Release 2|x64.ActiveCfg = Release 2|x64
+		{63BB8516-C9D8-4F7C-8229-A40FE54247E6}.Release 2|x64.Build.0 = Release 2|x64
+		{63BB8516-C9D8-4F7C-8229-A40FE54247E6}.Release 2|x86.ActiveCfg = Release 2|Win32
+		{63BB8516-C9D8-4F7C-8229-A40FE54247E6}.Release 2|x86.Build.0 = Release 2|Win32
 		{63BB8516-C9D8-4F7C-8229-A40FE54247E6}.Release|x64.ActiveCfg = Release|x64
 		{63BB8516-C9D8-4F7C-8229-A40FE54247E6}.Release|x64.Build.0 = Release|x64
 		{63BB8516-C9D8-4F7C-8229-A40FE54247E6}.Release|x86.ActiveCfg = Release|Win32
 		{63BB8516-C9D8-4F7C-8229-A40FE54247E6}.Release|x86.Build.0 = Release|Win32
 		{29B9A060-88FB-4A72-AA78-CF719D83EB68}.Debug|x64.ActiveCfg = Release|x64
 		{29B9A060-88FB-4A72-AA78-CF719D83EB68}.Debug|x86.ActiveCfg = Release|x64
+		{29B9A060-88FB-4A72-AA78-CF719D83EB68}.Release 2|x64.ActiveCfg = Release|x64
+		{29B9A060-88FB-4A72-AA78-CF719D83EB68}.Release 2|x86.ActiveCfg = Release|x64
 		{29B9A060-88FB-4A72-AA78-CF719D83EB68}.Release|x64.ActiveCfg = Release|x64
 		{29B9A060-88FB-4A72-AA78-CF719D83EB68}.Release|x86.ActiveCfg = Release|x64
 	EndGlobalSection

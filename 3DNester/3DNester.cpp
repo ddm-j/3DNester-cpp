@@ -12,7 +12,7 @@ int main()
     LOG("Firing up the 3D Nester");
 
     // Create a part
-    Octree tree("GenerativeBracket.stl", 10.0);
+    Octree tree("GenerativeBracket.stl", 10);
 
     // Create a scene
     Eigen::Vector3d envelope = { 380, 284, 380 };
@@ -40,10 +40,16 @@ int main()
 
     LOG("Testing collisions");
     auto start = chrono::high_resolution_clock::now();
-    scene.part_collisions(1);
+    std::vector<int> indices(1);
+    for (int i = 0; i < max - 1; i++)
+    {
+        indices[0] = i;
+        scene.total_collisions(indices);
+    }
     auto stop = chrono::high_resolution_clock::now();
     auto diff = chrono::duration_cast<chrono::milliseconds>(stop - start);
     LOG(diff.count());
+    LOG(scene.sum_collisions());
     
     /*
     for (int i = 0; i < max; i++)

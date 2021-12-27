@@ -140,4 +140,33 @@ namespace util {
 
 		return (u - v).norm() <= distance;
 	}
+
+	bool outside_envelope(Eigen::Vector4d point, Eigen::Vector3d envelope, double distance, bool partial)
+	{
+		// Calculate if point is outside of build envelope
+		bool outX, outY, outZ;
+		int mod = partial ? 1 : -1;
+
+		// Conditions for partial/complete outlier
+		outX = (point(0) + mod * -1 * distance < 0) || (point(0) + mod * distance > envelope(0));
+		outY = (point(1) + mod * -1 * distance < 0) || (point(1) + mod * distance > envelope(1));
+		outZ = (point(2) + mod * -1 * distance < 0) || (point(2) + mod * distance > envelope(2));
+
+		if (outX)
+		{
+			return true;
+		}
+		else if (outY)
+		{
+			return true;
+		}
+		else if (outZ)
+		{
+			return true;
+		}
+		else
+		{
+			return false;
+		}
+	}
 }

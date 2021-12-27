@@ -16,7 +16,7 @@ Scene::Scene(Octree referencePart, Eigen::Vector3d envelope, double partInterval
 	this->envelope = envelope;
 
 	// Initialize other variables
-	this->collisionArray.fill({}); // Should fill the collision array with zeros
+	this->partCollisions.fill({}); // Should fill the collision array with zeros
 }
 
 void Scene::add_part(Eigen::Vector3d location, bool random)
@@ -26,7 +26,8 @@ void Scene::add_part(Eigen::Vector3d location, bool random)
 	this->idCount++;
 	Object* pObj = new Object();
 
-	// Add new object to pointer vector
+	// Add new object to pointer vector & envelop 
+	this->envelopeCollisions.push_back(0);
 	this->objects.push_back(pObj);
 
 	if (random)
@@ -49,6 +50,7 @@ void Scene::remove_part(int index)
 
 	// Remove collision data
 	this->remove_collision_pairs(index);
+	this->envelopeCollisions.erase(this->envelopeCollisions.begin() + index);
 
 	// Locate the part pointer and delete the object
 	delete this->objects[index];
@@ -60,7 +62,7 @@ void Scene::remove_part(int index)
 
 void Scene::part_collisions(int index)
 {
-	// Calculates part collisions between part at given index in object vector and all other objects.
+	// Calculates part collisions between part at given index in the instance object vector and all other objects.
 	double broad_distance = 2 * this->referencePart.rootRadius + this->partInterval;
 	int collisions = 0;
 	int r, c;
@@ -79,16 +81,85 @@ void Scene::part_collisions(int index)
 				{
 					// NARROW PHASE ALGORITHM
 					collisions = 0;
-					this->referencePart.collision_test(this->objects[index]->affine, this->objects[i]->affine, 1, 1, this->partInterval, collisions);
+					this->referencePart.part_collision_test(this->objects[index]->affine, this->objects[i]->affine, 1, 1, this->partInterval, collisions);
 
 					// Store collision data
 					r = index < i ? index : i;
 					c = index < i ? i : index;
-					this->collisionArray(r, c) = collisions;
+					this->partCollisions(r, c) = collisions;
 				}
 			}
 		}
 	}
+}
+
+void Scene::envelope_collisions(int index)
+{
+	// Calculates the number of leaf nodes outside of the build envelope
+	double broad_distance = this->referencePart.rootRadius + this->partInterval;
+	int collisions = 0;
+
+	if (this->nParts > 0)
+	// Don't run this check if there are zero parts
+	{
+		// BROAD PHASE ALGORITHM
+		if (util::outside_envelope(this->objects[index]->get_center(), this->envelope, broad_distance, 0))
+		{
+			// Complete outlier detected
+			this->envelopeCollisions[index] = this->referencePart.leafNodeCount;
+		}
+		else if (util::outside_envelope(this->objects[index]->get_center(), this->envelope, broad_distance))
+		{
+			// Partial outlier detected: NARROW PHASE ALGORITHM
+			this->referencePart.envelope_collision_test(
+				this->objects[index]->affine, 1, this->envelope, this->envelopeInterval, collisions
+			);
+			this->envelopeCollisions[index] = collisions;
+		}
+		else
+		{
+			// No collisions
+			this->envelopeCollisions[index] = 0;
+		}
+	}
+
+}
+
+int Scene::total_collisions(std::vector<int> indices)
+{
+	// Calculates the collisions for a set of indices. Then sums all of the collisions in the entire scene.
+
+	// Loop through the part indices
+	for (int i = 0; i < indices.size(); i++)
+	{
+		// Calculate the collisions for these parts
+		this->part_collisions(indices[i]);
+		this->envelope_collisions(indices[i]);
+	}
+
+	return this->sum_collisions();
+}
+
+int Scene::sum_collisions()
+{
+	// Sums all of the collisions in the scene
+	int total = 0;
+
+	// Loop
+	for (int i = 0; i < this->nParts; i++)
+	{
+		
+		// Sum the part 2 part collisions
+		for (int j = i; j < this->nParts; j++)
+		{
+			total += this->partCollisions(i, j);
+		}
+
+		// Sum the part 2 envelope collisions
+		total += this->envelopeCollisions[i];
+	}
+
+	return total;
 }
 
 

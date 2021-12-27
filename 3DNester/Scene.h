@@ -13,7 +13,8 @@ public:
 	double partInterval, envelopeInterval; // Target part & envelope spacings
 	int nParts = 0, nPairs = 0, idCount = 0; // Counters
 	std::vector<Object*> objects; // Vector of pointers to objects in the scene
-	Eigen::MatrixXi collisionArray = Eigen::MatrixXi(5000, 5000); // Array holding collision data
+	Eigen::MatrixXi partCollisions = Eigen::MatrixXi(5000, 5000); // Array holding part to part collision data
+	std::vector<int> envelopeCollisions; // Vector holding part to envelope collision data
 	Octree referencePart; // Octree reference part
 	Eigen::Vector3d envelope;
 
@@ -25,6 +26,12 @@ public:
 	void remove_part(int index);
 
 	void part_collisions(int index);
+
+	void envelope_collisions(int index);
+
+	int total_collisions(std::vector<int> indices);
+
+	int sum_collisions();
 
 
 private:
@@ -38,20 +45,20 @@ private:
 		{
 			for (int j = i; j < this->nParts - 1; j++)
 			{
-				this->collisionArray(i, j) = this->collisionArray(i + 1, j + 1);
+				this->partCollisions(i, j) = this->partCollisions(i + 1, j + 1);
 			}
 		}
 
 		// Shift the top row
 		for (int j = index; j < this->nParts - 1; j++)
 		{
-			this->collisionArray(0, j) = this->collisionArray(0, j + 1);
+			this->partCollisions(0, j) = this->partCollisions(0, j + 1);
 		}
 
 		// Set column n-1 to zero
 		for (int i = 0; i < this->nParts; i++)
 		{
-			this->collisionArray(i, this->nParts - 1) = 0;
+			this->partCollisions(i, this->nParts - 1) = 0;
 		}
 	}
 };

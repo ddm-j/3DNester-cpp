@@ -1,8 +1,7 @@
 #pragma once
-#include <opencv2/opencv.hpp>
 #include "vcg/complex/complex.h"
 #include "wrap/io_trimesh/import.h"
-#include<wrap/io_trimesh/export_off.h>
+#include <wrap/io_trimesh/export_off.h>
 #include "vcg/simplex/vertex/base.h"
 #include "vcg/simplex/vertex/component.h"
 #include "vcg/simplex/face/base.h"

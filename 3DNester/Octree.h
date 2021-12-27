@@ -24,7 +24,8 @@ public:
 	double leafRadius; // Scalar radius of the leaf nodes. Used in collision detection
 	int maxDepth; // Maximum tree depth, calculated during construction
 	Node* rootNode; // Pointer to the root node of the octree
-	std::unordered_map<int, Node *> treeMap;
+	std::unordered_map<int, Node *> treeMap; // Hash map containing the nodes in the tree
+	int leafNodeCount = 0;
 
 	// Public Methods
 	Octree();
@@ -37,7 +38,9 @@ public:
 
 	void traverse_tree(Node * pNode);
 
-	void collision_test(Eigen::Matrix4d u, Eigen::Matrix4d v, int pU, int pV, double interval, int& cnt);
+	void part_collision_test(Eigen::Matrix4d u, Eigen::Matrix4d v, int pU, int pV, double interval, int& cnt);
+
+	void envelope_collision_test(Eigen::Matrix4d u, int pU, Eigen::Vector3d envelope, double interval, int& cnt);
 
 private:
 

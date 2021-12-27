@@ -9,7 +9,7 @@
 
 Octree::Octree()
 {
-
+	// Empty default constructor
 }
 
 Octree::Octree(const char* file_path, double vox_size)
@@ -146,6 +146,9 @@ void Octree::build_tree(Node *parent, Eigen::MatrixXd points, Eigen::Matrix<doub
 			// In this case, we are at maximum depth and this is a leaf node
 			Node* pNode = new Node(this, (nodes.col(i*2) + nodes.col(i*2 + 1)) / 2, parent->key, i, true);
 
+			// Increment the leaf node counter
+			this->leafNodeCount++;
+
 			// Advance the childmask
 			parent->advance_child_mask(i);
 		}
@@ -186,7 +189,7 @@ void Octree::traverse_tree(Node * pNode)
 	}
 }
 
-void Octree::collision_test(Eigen::Matrix4d u, Eigen::Matrix4d v, int pU, int pV, double interval, int& cnt)
+void Octree::part_collision_test(Eigen::Matrix4d u, Eigen::Matrix4d v, int pU, int pV, double interval, int& cnt)
 {
 	// Test the number of leaf collisions between two instances of octree (defined by different affine positions U & V)
 
@@ -218,11 +221,49 @@ void Octree::collision_test(Eigen::Matrix4d u, Eigen::Matrix4d v, int pU, int pV
 					else
 					{
 						// We are not at max depth of the tree. Recursively go deeper
-						Octree::collision_test(u, v, childKeyU, childKeyV, interval, cnt);
+						Octree::part_collision_test(u, v, childKeyU, childKeyV, interval, cnt);
 					}
 				}
 
 			}
+		}
+	}
+}
+
+void Octree::envelope_collision_test(Eigen::Matrix4d u, int pU, Eigen::Vector3d envelope, double interval, int& cnt)
+{
+	// Calculate the number of leafs that are not within the envelope bounds
+	// Similar to Octree::part_collision_test() but with no nested loops & and a different collision test.
+
+	// Loop through the children of U, testing envelope collisions
+	int8_t maskU = this->treeMap.at(pU)->childMask;
+	int childKeyU;
+	double dist;
+
+	for (int j = 0; j < 8; j++)
+	{
+		if (maskU & (1 << j))
+		{
+			// Test for a collision at this level
+			childKeyU = (pU << 3) + j;
+
+			dist = this->treeMap.at(childKeyU)->radius + interval;
+		
+			if (util::outside_envelope(u * this->treeMap.at(childKeyU)->center, envelope, dist))
+			{
+				// Potential collision detected
+				if (this->treeMap.at(childKeyU)->isLeaf)
+				{
+					// We are at max depth. Increment the counter
+					cnt++;
+				}
+				else
+				{
+					// We are not at max depth of the tree. Recursively go deeper
+					Octree::envelope_collision_test(u, childKeyU, envelope, interval, cnt);
+				}
+			}
+
 		}
 	}
 }

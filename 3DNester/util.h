@@ -18,4 +18,6 @@ namespace util
 	Eigen::Matrix4d rotation_matrix(double angle, int axis, bool degrees);
 
 	bool sphere_collision(Eigen::Vector4d u, Eigen::Vector4d v, double distance);
+
+	bool outside_envelope(Eigen::Vector4d point, Eigen::Vector3d envelope, double distance, bool partial = 1);
 }
