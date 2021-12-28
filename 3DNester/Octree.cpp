@@ -45,6 +45,7 @@ Octree::Octree(const char* file_path, double vox_size)
 	point_density = 15.0 / max_voxel_sa;
 
 	this->calc_surface_area(m);
+	this->calc_volume(m);
 	min_points = round(this->mesh_sa * point_density);
 
 	// Perform Poisson Sampling over the Mesh

@@ -16,7 +16,8 @@ public:
 	Eigen::MatrixXi partCollisions = Eigen::MatrixXi(5000, 5000); // Array holding part to part collision data
 	std::vector<int> envelopeCollisions; // Vector holding part to envelope collision data
 	Octree referencePart; // Octree reference part
-	Eigen::Vector3d envelope;
+	Eigen::Vector3d envelope; // Vector containing the max coordinate of the build envelope (x, y, z dimensions)
+	double sceneVolume;
 
 	// Public Class Methods
 	Scene(Octree referencePart, Eigen::Vector3d envelope, double partInterval, double envelopeInterval);
@@ -33,6 +34,7 @@ public:
 
 	int sum_collisions();
 
+	double packing_density();
 
 private:
 

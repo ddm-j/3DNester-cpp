@@ -17,6 +17,7 @@ Scene::Scene(Octree referencePart, Eigen::Vector3d envelope, double partInterval
 
 	// Initialize other variables
 	this->partCollisions.fill({}); // Should fill the collision array with zeros
+	this->sceneVolume = envelope.prod();
 }
 
 void Scene::add_part(Eigen::Vector3d location, bool random)
@@ -160,6 +161,24 @@ int Scene::sum_collisions()
 	}
 
 	return total;
+}
+
+double Scene::packing_density()
+{
+	// Calculates the packing density of the scene
+
+	// Get number of parts that are COMPLETELY inside the scene
+	int cnt = 0;
+	for (int i = 0; i < this->envelopeCollisions.size(); i++)
+	{
+		if (this->envelopeCollisions[i] == 0)
+		{
+			cnt++;
+		}
+	}
+
+	return cnt * this->referencePart.mesh_v / this->sceneVolume;
+
 }
 
 

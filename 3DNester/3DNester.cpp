@@ -18,8 +18,6 @@ int main()
     Eigen::Vector3d envelope = { 380, 284, 380 };
     Scene scene(tree, envelope, 2.5, 2.5);
 
- 
-
     // Test collision pairing matrix removal
     Eigen::Vector3d n;
     int cnt = 0;
@@ -29,13 +27,6 @@ int main()
     {
         // Add a part
         scene.add_part(n, 1.0);
-
-        // Add phony collision data
-        for (int j = i; j < max; j++)
-        {
-            //scene.collisionArray(i, j) = cnt;
-            cnt++;
-        }
     }
 
     LOG("Testing collisions");
@@ -49,7 +40,7 @@ int main()
     auto stop = chrono::high_resolution_clock::now();
     auto diff = chrono::duration_cast<chrono::milliseconds>(stop - start);
     LOG(diff.count());
-    LOG(scene.sum_collisions());
+    LOG(scene.packing_density());
     
     /*
     for (int i = 0; i < max; i++)
