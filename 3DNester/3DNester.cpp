@@ -18,6 +18,10 @@ int main()
     Eigen::Vector3d envelope = { 380, 284, 380 };
     Scene scene(tree, envelope, 2.5, 2.5);
 
+    // Test the Optimizer
+    scene.optimize();
+
+    /*
     // Test collision pairing matrix removal
     Eigen::Vector3d n;
     int cnt = 0;
@@ -41,6 +45,8 @@ int main()
     auto diff = chrono::duration_cast<chrono::milliseconds>(stop - start);
     LOG(diff.count());
     LOG(scene.packing_density());
+
+    */
     
     /*
     for (int i = 0; i < max; i++)

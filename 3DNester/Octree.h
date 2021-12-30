@@ -14,7 +14,7 @@ class Octree
 public:
 
 	// Class Variable Declarations
-	double mesh_sa, mesh_v; // Surface area & volume of mesh
+	double mesh_sa, mesh_v, bboxVol; // Surface area & volume of mesh
 	Eigen::Vector4d bboxCenter; // Center point of the down-sampled (poisson) pointcloud bounding box
 	Eigen::Matrix<double, 4, 2> bboxMinMax; // Min & Max Vectors of the bounding box
 	Eigen::MatrixXd samplePoints; // Matrix 3xN_samples (unknown size) that will store the poisson sampled mesh points

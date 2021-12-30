@@ -15,12 +15,22 @@ Scene::Scene(Octree referencePart, Eigen::Vector3d envelope, double partInterval
 	this->referencePart = referencePart;
 	this->envelope = envelope;
 
+	// Initialize optimiation variables
+	for (int i = 0; i < this->totalMoves - 1; i++)
+	{
+		this->quality.push_back(0.0);
+		this->deltaObj.push_back(0.0);
+		this->probability.push_back(this->minProb + this->remProb / this->totalMoves);
+		this->probability.push_back(0);
+	}
+
 	// Initialize other variables
 	this->partCollisions.fill({}); // Should fill the collision array with zeros
+	this->optPreObjectives.fill({});
 	this->sceneVolume = envelope.prod();
 }
 
-void Scene::add_part(Eigen::Vector3d location, bool random)
+int Scene::add_part(Eigen::Vector3d location, bool random)
 {
 	// Add a object to the scene
 	this->nParts++;
@@ -43,6 +53,8 @@ void Scene::add_part(Eigen::Vector3d location, bool random)
 		// Initialize the part using the location vector provided
 		pObj->affine.block(0, 3, 3, 1) = location;
 	}
+
+	return this->objects.size() - 1;
 }
 
 void Scene::remove_part(int index)
@@ -59,6 +71,33 @@ void Scene::remove_part(int index)
 
 	// Decrement our part counter
 	this->nParts--;
+}
+
+void Scene::translate_part(int index, Eigen::Vector4d vector)
+{
+	// Translate a part (given by index) by a relative vector
+	this->objects[index]->translate(vector);
+}
+
+void Scene::rotate_part(int index, int axis, double angle)
+{
+	// Rotate a part (given by index) on axis (0 - x, 1 - y, 2 - z) by an angle (default is degrees)
+	this->objects[index]->rotate(angle, axis);
+}
+
+void Scene::swap_parts(int index1, int index2)
+{
+	// Swaps the locations of two parts (without modifying their rotations)
+	Eigen::Vector4d temp;
+
+	// This is the only part modification method that does not create backups in its constituents.
+	this->objects[index1]->backup();
+	this->objects[index2]->backup();
+
+	// Swap the object centerpoints
+	temp = this->objects[index1]->get_center();
+	this->objects[index1]->affine.col(3) = this->objects[index2]->get_center();
+	this->objects[index2]->affine.col(3) = temp;
 }
 
 void Scene::part_collisions(int index)
@@ -178,6 +217,119 @@ double Scene::packing_density()
 	}
 
 	return cnt * this->referencePart.mesh_v / this->sceneVolume;
+
+}
+
+std::vector<int> Scene::update_state()
+{
+	// Select a move and perform a state update. Returns vector {moveIndex, partIndex, [partIndex2]}
+	int moveSelection = util::rand_select(this->probability);
+	int partSelection, partSelection2;
+	std::vector<int> selections;
+	selections.push_back(moveSelection);
+
+	// Select random part(s) to be moved
+	partSelection = util::rand_int(this->nParts - 1);
+	partSelection2 = util::rand_int(this->nParts - 1);
+	while (partSelection == partSelection2)
+	// Protect from selecting the same part (in case of swap move)
+	{
+		partSelection2 = util::rand_int(this->nParts - 1);
+	}
+
+	// Select a move to update the state
+	if (moveSelection < this->transMoves)
+	// Translation Move Selected
+	{
+		// Generate random unit vector and scale it accordingly
+		double mag = this->minTrans + moveSelection * this->step;
+		Eigen::Vector4d trans{1, 1, 1, 1};
+		trans.segment(0, 3) = mag * util::rand_unit_vector();
+
+		// Translate the selected part
+		this->translate_part(partSelection, trans);
+		selections.push_back(partSelection);
+	}
+	else if (moveSelection == this->transMoves)
+	// Rotation Move Selected
+	{
+		this->rotate_part(partSelection, util::rand_int(2), 90 * (util::rand_int(2) + 1));
+		selections.push_back(partSelection);
+	}
+	else if (moveSelection == this->transMoves + 1)
+	// Swap Move Selected
+	{
+		this->swap_parts(partSelection, partSelection2);
+		selections.push_back(partSelection);
+		selections.push_back(partSelection2);
+	}
+	else if (moveSelection == this->transMoves + 2)
+	// Add Part Move Selected
+	{
+		Eigen::Vector3d dummy;
+		int ind;
+		ind = this->add_part(dummy, 1.0);
+		selections.push_back(ind);
+	}
+	else
+	// Remove Part Move Selected
+	{
+		this->remove_part(partSelection);
+	}
+
+	return selections;
+}
+
+double Scene::objective_function(std::vector<int> moves)
+{
+	// Calculates the current value of the objective function for the scene
+	double collisions, density;
+
+	density = 1.0 / this->packing_density();
+	this->cD = max(this->cD, density);
+
+	if (moves[0] == this->totalMoves - 1)
+	// Part has been removed from the scene - collisions do not need re-calculation
+	{
+		collisions = this->sum_collisions();
+		this->cC = max(this->cC, collisions);
+	}
+	else
+	// Collisions need to be calculated
+	{
+		collisions = this->total_collisions(std::vector<int>(moves.begin() + 1, moves.end()));
+		this->cC = max(this->cC, collisions);
+	}
+
+	return this->cC * collisions + this->cD * density;
+}
+
+void Scene::optimize()
+{
+	// Optimize the scene (Simulated Annealing)
+
+	// Pre-process the optimizer (calculate initial annealing temperature)
+	// Add a naive packing guess of how many parts can fit in the build
+	int preParts = round(this->sceneVolume / this->referencePart.bboxVol);
+	Eigen::Vector3d dummy;
+	for (int i = 0; i < preParts; i++)
+	{
+		int ind = this->add_part(dummy, 1.0);
+	}
+	printf("%i parts generated for preprocessing.\n", this->nParts);
+
+	// Random walk through the solution space
+	std::vector<int> moves;
+	for (int i = 0; i < this->optPreSteps; i++)
+	{
+		moves = this->update_state();
+		this->optPreObjectives(i) = this->objective_function(moves);
+	}
+	// Calculate the initial temperature for annealing
+	double std_dev = sqrt((this->optPreObjectives.array() - this->optPreObjectives.mean()).square().sum() / (this->optPreObjectives.size() - 1));
+	double Ti = -3 * std_dev / log(0.85);
+	LOG("Initial Temperature for annealing calculated as:");
+	LOG(Ti);
 
 }
 

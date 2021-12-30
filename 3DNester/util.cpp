@@ -6,6 +6,11 @@
 
 namespace util {
 
+	// Namespace variables
+	std::random_device rd;
+	std::default_random_engine eng(rd());
+	std::normal_distribution<> normalDist{ 0.0, 1.0 };
+
 	Eigen::Matrix<double, 3, 16> split_node(Eigen::Matrix<double, 3, 2> node)
 	{
 		// Takes a node definition (minimum vector, maximum vector) and splits it into 8 min/max pairs for child nodes
@@ -82,11 +87,38 @@ namespace util {
 
 	double rand_double(double min, double max)
 	{
-		std::random_device rd;
-		std::default_random_engine eng(rd());
 		std::uniform_real_distribution<double> distr(min, max);
-
 		return distr(eng);
+	}
+
+	int rand_select(std::vector<double> weights)
+	{
+		// Selects a random index given the weights for each index
+		std::discrete_distribution<> d(weights.begin(), weights.end());
+		return d(eng);
+	}
+
+	int rand_int(int n)
+	{
+		// Random integer between 0 and n-1
+		printf("Generating random integer %i", n);
+		std::uniform_int_distribution<> dist{ 0, n };
+		return dist(eng);
+	}
+
+	Eigen::Vector3d rand_unit_vector()
+	{
+		// Generates a random unit vector
+		// http://corysimon.github.io/articles/uniformdistn-on-sphere/
+		Eigen::Vector3d v;
+
+		// Randomly generate directions
+		v(0) = normalDist(eng);
+		v(1) = normalDist(eng);
+		v(2) = normalDist(eng);
+
+		// Normalize the vector
+		return v / v.norm();
 	}
 
 	Eigen::Matrix4d create_rotation_matrix(double angle, int axis, bool degrees)
