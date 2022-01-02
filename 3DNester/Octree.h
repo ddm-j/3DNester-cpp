@@ -146,7 +146,7 @@ struct Node {
 
 		// Calculate the radius of this node
 		int depth = util::get_depth(this->key);
-		int d = tree->rootSize / (pow(2, depth));
+		double d = tree->rootSize / (pow(2, depth));
 		this->radius = 3 * sqrt(d) / 2;
 
 		// Add this node to the tree hashmap

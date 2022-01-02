@@ -112,7 +112,7 @@ void Octree::update_bbox(Eigen::MatrixXd& pcd, double voxSize)
 	this->leafRadius = 3 * sqrt(this->rootSize / pow(2, this->maxDepth+1)) / 2;
 
 	// Update bounding box volume
-	this->bboxVol = (max - min).prod();
+	this->bboxVol = pow(this->rootSize, 3);
 
 	printf("Updating root radius to %f\n", this->rootRadius);
 	printf("Updating leaf radius to %f\n", this->leafRadius);

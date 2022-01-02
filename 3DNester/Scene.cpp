@@ -21,7 +21,8 @@ Scene::Scene(Octree referencePart, Eigen::Vector3d envelope, double partInterval
 		this->quality.push_back(0.0);
 		this->deltaObj.push_back(0.0);
 		this->probability.push_back(this->minProb + this->remProb / this->totalMoves);
-		this->probability.push_back(0);
+		this->tempCount.push_back(0);
+		this->objectiveChangePerMove.push_back(0);
 	}
 
 	// Initialize other variables
@@ -54,7 +55,7 @@ int Scene::add_part(Eigen::Vector3d location, bool random)
 		pObj->affine.block(0, 3, 3, 1) = location;
 	}
 
-	return this->objects.size() - 1;
+	return (int)this->objects.size() - 1;
 }
 
 void Scene::remove_part(int index)
@@ -283,25 +284,28 @@ std::vector<int> Scene::update_state()
 double Scene::objective_function(std::vector<int> moves)
 {
 	// Calculates the current value of the objective function for the scene
-	double collisions, density;
+	double density;
+	int collisions;
 
 	density = 1.0 / this->packing_density();
-	this->cD = max(this->cD, density);
+	this->cD = std::max(this->cD, density);
 
 	if (moves[0] == this->totalMoves - 1)
 	// Part has been removed from the scene - collisions do not need re-calculation
 	{
+		//LOG("Part removed");
 		collisions = this->sum_collisions();
-		this->cC = max(this->cC, collisions);
+		this->cC = std::max(this->cC, collisions);
 	}
 	else
 	// Collisions need to be calculated
 	{
+		//LOG("Part translated, rotated, swapped, or added");
 		collisions = this->total_collisions(std::vector<int>(moves.begin() + 1, moves.end()));
-		this->cC = max(this->cC, collisions);
+		this->cC = std::max(this->cC, collisions);
 	}
 
-	return this->cC * collisions + this->cD * density;
+	return collisions / this->cC + density / this->cD;
 }
 
 void Scene::optimize()
@@ -310,12 +314,7 @@ void Scene::optimize()
 
 	// Pre-process the optimizer (calculate initial annealing temperature)
 	// Add a naive packing guess of how many parts can fit in the build
-	int preParts = round(this->sceneVolume / this->referencePart.bboxVol);
-	Eigen::Vector3d dummy;
-	for (int i = 0; i < preParts; i++)
-	{
-		int ind = this->add_part(dummy, 1.0);
-	}
+	this->fill_random();
 	printf("%i parts generated for preprocessing.\n", this->nParts);
 
 	// Random walk through the solution space
@@ -325,11 +324,65 @@ void Scene::optimize()
 		moves = this->update_state();
 		this->optPreObjectives(i) = this->objective_function(moves);
 	}
+	LOG("Random walk through state space complete");
+
 	// Calculate the initial temperature for annealing
 	double std_dev = sqrt((this->optPreObjectives.array() - this->optPreObjectives.mean()).square().sum() / (this->optPreObjectives.size() - 1));
+	LOG(std_dev);
 	double Ti = -3 * std_dev / log(0.85);
-	LOG("Initial Temperature for annealing calculated as:");
-	LOG(Ti);
+	printf("Initial temperature Ti = %f", Ti);
+
+	// Reset the scene state
+	this->reset_state();
+
+	// Begin simulated annealing!
+	this->fill_random();
+	double T = Ti;
+	double f, f_best = 1000;
+	bool hot = 1;
+	int cnt = 0;
+	int acceptCnt = 0;
+	double prob;
+
+	while (hot)
+	{
+		for (int i = 0; i < 100; i++)
+		{
+			// Generate random move and update move attempt counter
+			moves = this->update_state();
+			this->tempCount[moves[0]]++;
+
+			// Calculate objective function and update tracker
+			f = this->objective_function(moves);
+			this->objectiveAtTemp.push_back(f);
+
+			if (f < f_best)
+			// Step accepted
+			{
+				acceptCnt++;
+				this->accept_state(moves[0], f, cnt == 0 ? 1.1 * f : f_best);
+			}
+			else
+			// Inferior step
+			{
+				prob = exp(-(f - f_best) / T);
+				if (util::rand_double(0, 1.0) < prob)
+				// Step accepted regardless of poor performance
+				{
+					acceptCnt++;
+					this->accept_state(moves[0], f, cnt == 0 ? 1.1 * f : f_best);
+				}
+				else
+				// Step rejected - undo state update
+				{
+					
+				}
+			}
+		}
+
+
+	}
+
 
 }
 

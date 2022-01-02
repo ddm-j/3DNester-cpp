@@ -83,6 +83,7 @@ namespace util {
 			if (d > 21) assert(0); // bad key
 		}
 		assert(0); // bad key
+		return -1;
 	}
 
 	double rand_double(double min, double max)
@@ -101,7 +102,6 @@ namespace util {
 	int rand_int(int n)
 	{
 		// Random integer between 0 and n-1
-		printf("Generating random integer %i", n);
 		std::uniform_int_distribution<> dist{ 0, n };
 		return dist(eng);
 	}

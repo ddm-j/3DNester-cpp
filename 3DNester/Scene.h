@@ -21,13 +21,16 @@ public:
 
 	// Optimization Declarations
 	double minTrans = 1.0, maxTrans = 30.0;
-	int transMoves = 15, totalMoves = transMoves + 4, optPreSteps = 300;
-	Eigen::VectorXd optPreObjectives = Eigen::VectorXd(300);
+	int transMoves = 15, totalMoves = transMoves + 3, optPreSteps = 2000;
+	Eigen::VectorXd optPreObjectives = Eigen::VectorXd(2000);
 	double step = (maxTrans - minTrans) / (transMoves - 1);
 	double minProb = 0.02, remProb = 1 - minProb * (transMoves + 2);
 	std::vector<double> quality, deltaObj, probability;
 	std::vector<int> tempCount;
-	double cC = 0, cD = 0; // Objective function coefficients (Collisions, Density)
+	std::vector<double> objectiveChangePerMove; // Tracks the change in objective function over accepted steps per move in move set
+	std::vector<double> objectiveAtTemp; // Tracks the change in objective function at a given temperature
+	double cD = 0; // Objective function coefficients (Collisions, Density)
+	int cC = 0;
 
 	// Public Class Methods
 	Scene(Octree referencePart, Eigen::Vector3d envelope, double partInterval, double envelopeInterval);
@@ -96,6 +99,62 @@ private:
 	void recover_state()
 	{
 		// Recover the previous state
+
+	}
+
+	void reset_state()
+	{
+		// Resets the state to default (Zero objects, no collision data)
+
+		// Collision pairing matrices
+		this->partCollisions.fill({});
+		this->previousPartCollisions.fill({});
+
+		// Envelope collision vectors
+		std::fill(this->envelopeCollisions.begin(), this->envelopeCollisions.end(), 0);
+		std::fill(this->previousEnvelopeCollisions.begin(), this->previousEnvelopeCollisions.end(), 0);
+
+		// Object structs in the scene
+		for (auto p : this->objects)
+		{
+			delete p;
+		}
+		this->objects.clear();
+	}
+
+	void fill_random()
+	{
+		// Fills the scene with random parts based on a naive packing method
+		double pack = round(this->sceneVolume / this->referencePart.bboxVol);
+		LOG(pack);
+		int preParts = (int)round(pack);
+		Eigen::Vector3d dummy;
+		for (int i = 0; i < preParts; i++)
+		{
+			int ind = this->add_part(dummy, 1);
+			// Calculate collisions in the scene
+			this->part_collisions(ind);
+			this->envelope_collisions(ind);
+		}
+	}
+
+	void accept_state(int moveIndex, double fNew, double fOld)
+	{
+		// Updates the optimization statistics for the scene at a new, accepted scene state
+
+		// Update delta of the objective function
+		this->objectiveChangePerMove[moveIndex] += abs(fNew - fOld);
+
+		// Update move quality
+		this->quality[moveIndex] = (1.0 / this->tempCount[moveIndex]) * this->objectiveChangePerMove[moveIndex];
+
+		// Update move selection probability
+		double qualitySum = 0;
+		for (auto& n : this->quality)
+		{
+			qualitySum += n;
+		}
+		this->probability[moveIndex] = this->minProb + this->remProb * (this->quality[moveIndex] / qualitySum);
 	}
 };
 
