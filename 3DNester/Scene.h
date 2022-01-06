@@ -1,6 +1,7 @@
 #pragma once
 #include "Common.h"
 #include "Octree.h"
+#include <numeric>
 
 struct Object;
 
@@ -12,21 +13,23 @@ public:
 	// Class Variable Declarations
 	double partInterval, envelopeInterval; // Target part & envelope spacings
 	int nParts = 0, nPairs = 0, idCount = 0; // Counters
-	std::vector<Object*> objects; // Vector of pointers to objects in the scene
+	std::vector<std::shared_ptr<Object>> objects, previousObjects; // Vector of pointers to objects in the scene
 	Eigen::MatrixXi partCollisions = Eigen::MatrixXi(5000, 5000), previousPartCollisions = Eigen::MatrixXi(5000, 5000); // Array holding part to part collision data
 	std::vector<int> envelopeCollisions, previousEnvelopeCollisions; // Vector holding part to envelope collision data
 	Octree referencePart; // Octree reference part
 	Eigen::Vector3d envelope; // Vector containing the max coordinate of the build envelope (x, y, z dimensions)
 	double sceneVolume;
+	double density; // Scene packing density
+	int collisions; // Total collisions in the scene
 
 	// Optimization Declarations
-	double minTrans = 1.0, maxTrans = 30.0;
-	int transMoves = 15, totalMoves = transMoves + 3, optPreSteps = 2000;
-	Eigen::VectorXd optPreObjectives = Eigen::VectorXd(2000);
+	double minTrans = 1.0, maxTrans = 50.0;
+	int transMoves = 5, totalMoves = transMoves + 4, optPreSteps = 1000;
+	Eigen::VectorXd optPreObjectives = Eigen::VectorXd(1000);
 	double step = (maxTrans - minTrans) / (transMoves - 1);
 	double minProb = 0.02, remProb = 1 - minProb * (transMoves + 2);
 	std::vector<double> quality, deltaObj, probability;
-	std::vector<int> tempCount;
+	std::vector<int> tempCount, prevTempCount;
 	std::vector<double> objectiveChangePerMove; // Tracks the change in objective function over accepted steps per move in move set
 	std::vector<double> objectiveAtTemp; // Tracks the change in objective function at a given temperature
 	double cD = 0; // Objective function coefficients (Collisions, Density)
@@ -37,7 +40,7 @@ public:
 
 	int add_part(Eigen::Vector3d location, bool random);
 
-	void remove_part(int index);
+	void remove_part(int index, bool delay);
 
 	void translate_part(int index, Eigen::Vector4d vector);
 
@@ -53,11 +56,13 @@ public:
 
 	int sum_collisions();
 
-	double packing_density();
+	double packing_density(bool complete);
 
 	std::vector<int> update_state();
 
 	double objective_function(std::vector<int> moves);
+
+	void recover_state(std::vector<int> moves);
 
 	void optimize();
 
@@ -94,12 +99,7 @@ private:
 		// Backup the current object state
 		this->previousEnvelopeCollisions = this->envelopeCollisions;
 		this->previousPartCollisions = this->partCollisions;
-	}
-
-	void recover_state()
-	{
-		// Recover the previous state
-
+		this->previousObjects = this->objects;
 	}
 
 	void reset_state()
@@ -115,22 +115,26 @@ private:
 		std::fill(this->previousEnvelopeCollisions.begin(), this->previousEnvelopeCollisions.end(), 0);
 
 		// Object structs in the scene
-		for (auto p : this->objects)
-		{
-			delete p;
-		}
 		this->objects.clear();
+		this->previousObjects.clear();
+
+		// Reset part counter
+		this->nParts = 0;
 	}
 
-	void fill_random()
+	void fill_random(int n = 0)
 	{
 		// Fills the scene with random parts based on a naive packing method
-		double pack = round(this->sceneVolume / this->referencePart.bboxVol);
-		LOG(pack);
-		int preParts = (int)round(pack);
-		Eigen::Vector3d dummy;
-		for (int i = 0; i < preParts; i++)
+		if (n == 0)
 		{
+			// Calculate a naive packing estimate
+			double pack = round(this->sceneVolume / this->referencePart.bboxVol);
+			n = (int)round(pack);
+		}
+		Eigen::Vector3d dummy;
+		for (int i = 0; i < n; i++)
+		{
+			LOG(i);
 			int ind = this->add_part(dummy, 1);
 			// Calculate collisions in the scene
 			this->part_collisions(ind);
@@ -146,15 +150,45 @@ private:
 		this->objectiveChangePerMove[moveIndex] += abs(fNew - fOld);
 
 		// Update move quality
-		this->quality[moveIndex] = (1.0 / this->tempCount[moveIndex]) * this->objectiveChangePerMove[moveIndex];
+		this->quality[moveIndex] = (1.0 / this->prevTempCount[moveIndex]) * this->objectiveChangePerMove[moveIndex];
 
-		// Update move selection probability
+		// Update move selection probabilities
 		double qualitySum = 0;
 		for (auto& n : this->quality)
 		{
 			qualitySum += n;
 		}
-		this->probability[moveIndex] = this->minProb + this->remProb * (this->quality[moveIndex] / qualitySum);
+
+		for (int i = 0; i < this->quality.size(); i++)
+		{
+			this->probability[i] = this->minProb + this->remProb * (this->quality[i] / qualitySum);
+		}
+		
+	}
+
+	void delete_object(int index)
+	{
+		// Delete an Object struct given an index in the objects vector
+		this->objects.erase(this->objects.begin() + index);
+	}
+
+	double cooling(double T, std::vector<double> v)
+	{
+		// Returns a new temperature for the next simulated annealing iteration
+
+		// Get the standard deviation of the objective function at this temperature
+		double sum = std::accumulate(std::begin(v), std::end(v), 0.0);
+		double m = sum / v.size();
+
+		double accum = 0.0;
+		std::for_each(std::begin(v), std::end(v), [&](const double d) {
+			accum += (d - m) * (d - m);
+			});
+
+		double stdev = sqrt(accum / (v.size() - 1));
+
+		// Calculate the new temperature
+		return T * exp(-(0.7 * T / stdev));
 	}
 };
 
@@ -167,6 +201,7 @@ struct Object
 	Object()
 	{
 		affine.setIdentity();
+
 	}
 
 	Eigen::Vector4d get_center()

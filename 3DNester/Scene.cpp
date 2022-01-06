@@ -15,13 +15,14 @@ Scene::Scene(Octree referencePart, Eigen::Vector3d envelope, double partInterval
 	this->referencePart = referencePart;
 	this->envelope = envelope;
 
-	// Initialize optimiation variables
-	for (int i = 0; i < this->totalMoves - 1; i++)
+	// Initialize optimization variables
+	for (int i = 0; i < this->totalMoves; i++)
 	{
 		this->quality.push_back(0.0);
 		this->deltaObj.push_back(0.0);
 		this->probability.push_back(this->minProb + this->remProb / this->totalMoves);
 		this->tempCount.push_back(0);
+		this->prevTempCount.push_back(0);
 		this->objectiveChangePerMove.push_back(0);
 	}
 
@@ -33,32 +34,32 @@ Scene::Scene(Octree referencePart, Eigen::Vector3d envelope, double partInterval
 
 int Scene::add_part(Eigen::Vector3d location, bool random)
 {
+	LOG("Adding part");
 	// Add a object to the scene
 	this->nParts++;
 	this->idCount++;
-	Object* pObj = new Object();
 
 	// Add new object to pointer vector & envelop 
 	this->envelopeCollisions.push_back(0);
-	this->objects.push_back(pObj);
+	this->objects.push_back(std::make_shared<Object>());
 
 	if (random)
 	{
 		// Initialize the part to a random location within the build volume
-		pObj->affine(0, 3) = util::rand_double(0.0, this->envelope(0));
-		pObj->affine(1, 3) = util::rand_double(0.0, this->envelope(1));
-		pObj->affine(2, 3) = util::rand_double(0.0, this->envelope(2));
+		this->objects.back()->affine(0, 3) = util::rand_double(0.0, this->envelope(0));
+		this->objects.back()->affine(1, 3) = util::rand_double(0.0, this->envelope(1));
+		this->objects.back()->affine(2, 3) = util::rand_double(0.0, this->envelope(2));
 	}
 	else
 	{
 		// Initialize the part using the location vector provided
-		pObj->affine.block(0, 3, 3, 1) = location;
+		this->objects.back()->affine.block(0, 3, 3, 1) = location;
 	}
 
 	return (int)this->objects.size() - 1;
 }
 
-void Scene::remove_part(int index)
+void Scene::remove_part(int index, bool delay = 1)
 {
 	// Removes a part from the scene
 
@@ -66,9 +67,11 @@ void Scene::remove_part(int index)
 	this->remove_collision_pairs(index);
 	this->envelopeCollisions.erase(this->envelopeCollisions.begin() + index);
 
-	// Locate the part pointer and delete the object
-	delete this->objects[index];
-	this->objects.erase(this->objects.begin()+index);
+	// Locate the part pointer and delete the object. Delay allows for the object to be retained in case of a rejected state update.
+	if (!delay)
+	{
+		this->delete_object(index);
+	}
 
 	// Decrement our part counter
 	this->nParts--;
@@ -200,24 +203,34 @@ int Scene::sum_collisions()
 		total += this->envelopeCollisions[i];
 	}
 
+	this->collisions = total;
+
 	return total;
 }
 
-double Scene::packing_density()
+double Scene::packing_density(bool complete = 0)
 {
 	// Calculates the packing density of the scene
+	int cnt;
 
+	if (complete)
 	// Get number of parts that are COMPLETELY inside the scene
-	int cnt = 0;
-	for (int i = 0; i < this->envelopeCollisions.size(); i++)
 	{
-		if (this->envelopeCollisions[i] == 0)
+		cnt = 0;
+		for (int i = 0; i < this->envelopeCollisions.size(); i++)
 		{
-			cnt++;
+			if (this->envelopeCollisions[i] == 0)
+			{
+				cnt++;
+			}
 		}
 	}
-
-	return cnt * this->referencePart.mesh_v / this->sceneVolume;
+	else
+	{
+		cnt = this->nParts;
+	}
+	this->density = cnt * this->referencePart.mesh_v / this->sceneVolume;
+	return this->density;
 
 }
 
@@ -225,9 +238,18 @@ std::vector<int> Scene::update_state()
 {
 	// Select a move and perform a state update. Returns vector {moveIndex, partIndex, [partIndex2]}
 	int moveSelection = util::rand_select(this->probability);
+	while ((moveSelection == this->transMoves + 3) && this->nParts <= 2)
+	{
+		// We cannot delete the last two parts
+		moveSelection = util::rand_select(this->probability);
+	}
+	
 	int partSelection, partSelection2;
 	std::vector<int> selections;
 	selections.push_back(moveSelection);
+
+	// Backup the current state
+	this->backup_state();
 
 	// Select random part(s) to be moved
 	partSelection = util::rand_int(this->nParts - 1);
@@ -250,12 +272,16 @@ std::vector<int> Scene::update_state()
 		// Translate the selected part
 		this->translate_part(partSelection, trans);
 		selections.push_back(partSelection);
+
+		//LOG("Translation move.");
 	}
 	else if (moveSelection == this->transMoves)
 	// Rotation Move Selected
 	{
 		this->rotate_part(partSelection, util::rand_int(2), 90 * (util::rand_int(2) + 1));
 		selections.push_back(partSelection);
+
+		//LOG("Rotation move.");
 	}
 	else if (moveSelection == this->transMoves + 1)
 	// Swap Move Selected
@@ -263,6 +289,8 @@ std::vector<int> Scene::update_state()
 		this->swap_parts(partSelection, partSelection2);
 		selections.push_back(partSelection);
 		selections.push_back(partSelection2);
+
+		//LOG("Swap move.");
 	}
 	else if (moveSelection == this->transMoves + 2)
 	// Add Part Move Selected
@@ -271,11 +299,15 @@ std::vector<int> Scene::update_state()
 		int ind;
 		ind = this->add_part(dummy, 1.0);
 		selections.push_back(ind);
+
+		//LOG("Add part move.");
 	}
 	else
 	// Remove Part Move Selected
 	{
 		this->remove_part(partSelection);
+
+		//LOG("Remove part");
 	}
 
 	return selections;
@@ -305,7 +337,41 @@ double Scene::objective_function(std::vector<int> moves)
 		this->cC = std::max(this->cC, collisions);
 	}
 
-	return collisions / this->cC + density / this->cD;
+	double obj = (double)collisions / (this->cC==0?1:this->cC) + density / (this->cD==0?1:this->cD);
+	//double obj = collisions + density;
+
+
+	return obj;
+}
+
+void Scene::recover_state(std::vector<int> moves)
+{
+	// Recover the previous state. Similar to CTRL+Z. Takes move vector.
+
+	// Undo part update
+	if (moves[0] == this->transMoves + 2)
+		// Add part move, we need to delete the part
+	{
+		this->delete_object(moves[1]);
+		this->nParts--;
+	}
+	else if (moves[0] == this->transMoves + 3)
+		// Remove part move, we need to re-increment the part counter. Part deletion is by default 'delayed' for this purpose.
+	{
+		this->nParts++;
+	}
+
+	// Undo object affine matrix alterations
+	for (int i = 1; i < moves.size(); i++)
+	{
+		this->objects[i]->undo();
+	}
+
+	// Undo collision histories
+	this->envelopeCollisions = this->previousEnvelopeCollisions;
+	this->partCollisions = this->previousPartCollisions;
+	this->objects = this->previousObjects;
+
 }
 
 void Scene::optimize()
@@ -328,15 +394,17 @@ void Scene::optimize()
 
 	// Calculate the initial temperature for annealing
 	double std_dev = sqrt((this->optPreObjectives.array() - this->optPreObjectives.mean()).square().sum() / (this->optPreObjectives.size() - 1));
-	LOG(std_dev);
 	double Ti = -3 * std_dev / log(0.85);
-	printf("Initial temperature Ti = %f", Ti);
+	printf("Initial temperature Ti = %f\n", Ti);
 
 	// Reset the scene state
+	LOG("Reseting scene.");
 	this->reset_state();
 
 	// Begin simulated annealing!
+	LOG("Re-initializing random start state");
 	this->fill_random();
+	LOG("Random start state initialized.");
 	double T = Ti;
 	double f, f_best = 1000;
 	bool hot = 1;
@@ -344,12 +412,39 @@ void Scene::optimize()
 	int acceptCnt = 0;
 	double prob;
 
-	while (hot)
+	while (T > 0)
 	{
-		for (int i = 0; i < 100; i++)
+		// Reset temperature statistics
+		this->objectiveAtTemp.clear();
+		std::fill(this->tempCount.begin(), this->tempCount.end(), 0);
+		acceptCnt = 0;
+		this->cC = 0, this->cD = 0;
+
+		printf("\nT - %f, Parts - %i, Collisions - %i, Density - %f\n", T, this->nParts, this->collisions, this->density);
+		LOG("\nProbabilities:");
+		for (auto i : this->probability)
+		{
+			std::cout << i << " ";
+		}
+		LOG("\nQualities:");
+		for (auto i : this->quality)
+		{
+			std::cout << i << " ";
+		}
+		LOG("\nLast Temp Counts:");
+		for (auto i : this->prevTempCount)
+		{
+			std::cout << i << " ";
+		}
+
+		for (int i = 0; i < 1000; i++)
 		{
 			// Generate random move and update move attempt counter
 			moves = this->update_state();
+			if (cnt == 0)
+			{
+				this->prevTempCount[moves[0]]++;
+			}
 			this->tempCount[moves[0]]++;
 
 			// Calculate objective function and update tracker
@@ -361,6 +456,9 @@ void Scene::optimize()
 			{
 				acceptCnt++;
 				this->accept_state(moves[0], f, cnt == 0 ? 1.1 * f : f_best);
+
+				// Only set a new step if the new objective value is lower
+				f_best = f;
 			}
 			else
 			// Inferior step
@@ -375,12 +473,24 @@ void Scene::optimize()
 				else
 				// Step rejected - undo state update
 				{
-					
+					this->recover_state(moves);
 				}
 			}
+
+			// Check if equilibrium criteria are met
+			/*
+			if (acceptCnt > 100)
+			{
+				break;
+			}
+			*/
 		}
 
+		// Equilibrium at this Temp has been met. Run cooling function
+		T = this->cooling(T, this->objectiveAtTemp);
 
+		// Set the current move counters to "previous"
+		this->prevTempCount = this->tempCount;
 	}
 
 
